@@ -12,6 +12,7 @@ AI-powered plant health analysis using **Transformers.js**. Everything runs in y
 - 🌙 **Dark Mode** - Auto-adapts to your system theme
 - 🎨 **Animated Background** - Beautiful floating leaves
 - 🔒 **100% Private** - No images are ever sent to a server
+- live link https://glittering-cassata-f5f736.netlify.app/
 
 ## 🛠️ Technology Stack
 
