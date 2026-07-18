@@ -14,7 +14,7 @@
         </header>
 
         <div class="tab-buttons">
-            <button id="cameraTabBtn">📸 Take Photo</button>
+            <button id="cameraTabBtn" class="active">📸 Take Photo</button>
             <button id="uploadTabBtn">📁 Upload Image</button>
         </div>
 
@@ -23,20 +23,21 @@
             <div id="cameraTab" class="tab-content">
                 <div class="camera-container">
                     <video id="video" autoplay playsinline></video>
-                    <button id="captureBtn">📸 Capture</button>
+                    <button id="captureBtn" class="capture-btn">📸 Capture</button>
                 </div>
             </div>
 
             <!-- Upload Tab -->
             <div id="uploadTab" class="tab-content" style="display: none;">
                 <div class="upload-container">
+                    <label for="fileInput">📁 Choose Image</label>
                     <input type="file" id="fileInput" accept="image/*">
                     <div id="imagePreview"></div>
                 </div>
             </div>
         </div>
 
-        <div id="loading" class="loading" style="display: none;">Analyzing... 🔍</div>
+        <div id="loading" class="loading" style="display: none;">🔍 Analyzing your plant...</div>
 
         <div id="resultContainer" class="result-container">
             <!-- Results will be dynamically inserted here -->
