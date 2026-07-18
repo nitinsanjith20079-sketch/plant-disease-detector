@@ -1,0 +1,151 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f7f6;
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+#app {
+    max-width: 600px;
+    width: 100%;
+    background: white;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    padding: 24px;
+    overflow: hidden;
+}
+
+header {
+    background: linear-gradient(135deg, #2e7d32, #43a047);
+    color: white;
+    padding: 24px;
+    border-radius: 12px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+header h1 { font-size: 1.8rem; margin-bottom: 8px; }
+header p { opacity: 0.9; font-size: 1rem; }
+
+.tab-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 20px;
+}
+
+.tab-buttons button {
+    padding: 12px 24px;
+    background: #e8f5e9;
+    color: #1b5e20;
+    border: 2px solid #2e7d32;
+    border-radius: 30px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex: 1;
+}
+
+.tab-buttons button:hover, .tab-buttons button.active {
+    background: #2e7d32;
+    color: white;
+}
+
+.content {
+    background: #f5f5f5;
+    padding: 20px;
+    border-radius: 12px;
+    min-height: 300px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.camera-container, .upload-container {
+    width: 100%;
+    text-align: center;
+}
+
+video, #imagePreview img {
+    width: 100%;
+    max-width: 400px;
+    border-radius: 8px;
+    background: #000;
+    margin-bottom: 12px;
+}
+
+#imagePreview img {
+    background: transparent;
+    border: 2px dashed #ccc;
+}
+
+button {
+    background: #2e7d32;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+button:hover { background: #1b5e20; }
+
+.loading {
+    text-align: center;
+    font-size: 1.2rem;
+    padding: 20px;
+    background: #fff3e0;
+    border-radius: 8px;
+}
+
+.result-container {
+    margin-top: 20px;
+}
+
+.result-card {
+    background: white;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    border-left: 6px solid #2e7d32;
+}
+
+.result-card.affected { border-left-color: #c62828; }
+
+.status-icon { font-size: 3rem; text-align: center; }
+.result-card h3 { text-align: center; margin: 8px 0; }
+.result-card .status { font-weight: bold; font-size: 1.2rem; text-align: center; }
+
+.confidence-bar {
+    background: #e0e0e0;
+    height: 10px;
+    border-radius: 5px;
+    margin: 16px 0;
+    overflow: hidden;
+}
+
+.confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4caf50, #2e7d32);
+    transition: width 0.8s ease;
+    width: 0%;
+}
+
+.advice {
+    background: #fff3e0;
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 16px;
+    font-size: 0.95rem;
+}
