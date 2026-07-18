@@ -1,5 +1,5 @@
 // ============================================
-// PLANT DISEASE DETECTOR - COMPLETE WORKING
+// PLANT DISEASE DETECTOR - TRANSFORMERS.JS FIXED
 // ============================================
 
 // --- DOM Elements ---
@@ -15,71 +15,29 @@ const loadingDiv = document.getElementById('loading');
 const resultContainer = document.getElementById('resultContainer');
 const modelStatus = document.getElementById('modelStatus');
 
-let classifier = null;
+let pipeline = null;
 let stream = null;
-let modelLoaded = false;
 
 // ============================================
-// PLANTVILLAGE CLASS NAMES (38 classes)
-// ============================================
-const CLASS_NAMES = [
-    'Apple___Apple_scab',
-    'Apple___Black_rot',
-    'Apple___Cedar_apple_rust',
-    'Apple___healthy',
-    'Blueberry___healthy',
-    'Cherry___Powdery_mildew',
-    'Cherry___healthy',
-    'Corn___Cercospora_leaf_spot',
-    'Corn___Common_rust',
-    'Corn___Northern_Leaf_Blight',
-    'Corn___healthy',
-    'Grape___Black_rot',
-    'Grape___Esca_(Black_Measles)',
-    'Grape___Leaf_blight_(Isariopsis_Leaf_Spot)',
-    'Grape___healthy',
-    'Orange___Haunglongbing_(Citrus_greening)',
-    'Peach___Bacterial_spot',
-    'Peach___healthy',
-    'Pepper,_bell___Bacterial_spot',
-    'Pepper,_bell___healthy',
-    'Potato___Early_blight',
-    'Potato___Late_blight',
-    'Potato___healthy',
-    'Raspberry___healthy',
-    'Soybean___healthy',
-    'Squash___Powdery_mildew',
-    'Strawberry___Leaf_scorch',
-    'Strawberry___healthy',
-    'Tomato___Bacterial_spot',
-    'Tomato___Early_blight',
-    'Tomato___Late_blight',
-    'Tomato___Leaf_Mold',
-    'Tomato___Septoria_leaf_spot',
-    'Tomato___Spider_mites',
-    'Tomato___Target_Spot',
-    'Tomato___Tomato_Yellow_Leaf_Curl_Virus',
-    'Tomato___Tomato_mosaic_virus',
-    'Tomato___healthy'
-];
-
-// ============================================
-// LOAD MODEL
+// LOAD MODEL - USING A SIMPLER APPROACH
 // ============================================
 async function loadModel() {
-    if (classifier) return classifier;
+    if (pipeline) return pipeline;
 
     try {
-        modelStatus.textContent = '🧠 Downloading AI model... (may take 1-2 minutes)';
+        modelStatus.textContent = '🧠 Loading AI model... (may take 1-2 minutes)';
         modelStatus.className = 'model-status';
 
-        const { pipeline } = await import('@huggingface/transformers');
+        // Import Transformers.js
+        const { pipeline: createPipeline } = await import('@huggingface/transformers');
 
-        classifier = await pipeline(
+        // Create the pipeline with a simpler config
+        pipeline = await createPipeline(
             'image-classification',
-            'Xenova/resnet-50',
+            'Xenova/vit-base-patch16-224',
             {
-                dtype: 'q8',
+                // Use FP16 for better performance
+                dtype: 'fp16',
                 progress_callback: (progress) => {
                     if (progress.status === 'progress') {
                         const pct = Math.round(progress.progress);
@@ -88,7 +46,6 @@ async function loadModel() {
                     if (progress.status === 'ready') {
                         modelStatus.textContent = '✅ Model ready! Upload or capture a plant photo.';
                         modelStatus.classList.add('ready');
-                        modelLoaded = true;
                     }
                 }
             }
@@ -96,8 +53,7 @@ async function loadModel() {
 
         modelStatus.textContent = '✅ Model ready! Upload or capture a plant photo.';
         modelStatus.classList.add('ready');
-        modelLoaded = true;
-        return classifier;
+        return pipeline;
 
     } catch (error) {
         console.error('❌ Model loading error:', error);
@@ -109,18 +65,42 @@ async function loadModel() {
 }
 
 // ============================================
-// RUN PREDICTION - FIXED
+// CONVERT IMAGE TO PROPER FORMAT
+// ============================================
+function imageToTensor(imageElement) {
+    // Create canvas
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Resize to model input size
+    const size = 224;
+    canvas.width = size;
+    canvas.height = size;
+    
+    // Draw image
+    ctx.drawImage(imageElement, 0, 0, size, size);
+    
+    // Get image data
+    const imageData = ctx.getImageData(0, 0, size, size);
+    
+    // Convert to tensor format (we return as URL for the pipeline)
+    return canvas.toDataURL('image/jpeg', 0.9);
+}
+
+// ============================================
+// RUN PREDICTION - COMPLETE REWRITE
 // ============================================
 async function runPrediction(imageDataUrl) {
     loadingDiv.style.display = 'block';
     resultContainer.innerHTML = '';
 
     try {
-        if (!classifier) {
+        // Ensure model is loaded
+        if (!pipeline) {
             await loadModel();
         }
 
-        if (!classifier) {
+        if (!pipeline) {
             loadingDiv.style.display = 'none';
             resultContainer.innerHTML = `
                 <div class="error" style="background:rgba(255,235,238,0.9);padding:20px;border-radius:16px;">
@@ -131,27 +111,30 @@ async function runPrediction(imageDataUrl) {
             return;
         }
 
-        // Create image element
+        // Load image
         const img = new Image();
         img.src = imageDataUrl;
         
-        await new Promise((resolve) => {
+        // Wait for image to load
+        await new Promise((resolve, reject) => {
             img.onload = resolve;
-            img.onerror = resolve;
+            img.onerror = reject;
             setTimeout(resolve, 5000);
         });
 
-        // Process image through canvas to ensure correct format
+        // Create a proper image element
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
-        canvas.width = 224;
-        canvas.height = 224;
-        ctx.drawImage(img, 0, 0, 224, 224);
         
-        // Get the image data as a new image
-        const processedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        // Set canvas size
+        const size = 224;
+        canvas.width = size;
+        canvas.height = size;
+        ctx.drawImage(img, 0, 0, size, size);
+        
+        // Create a new image from canvas
         const processedImg = new Image();
-        processedImg.src = processedDataUrl;
+        processedImg.src = canvas.toDataURL('image/jpeg', 0.9);
         
         await new Promise((resolve) => {
             processedImg.onload = resolve;
@@ -159,17 +142,19 @@ async function runPrediction(imageDataUrl) {
         });
 
         // Run prediction
-        const results = await classifier(processedImg);
+        const results = await pipeline(processedImg);
 
         if (!results || results.length === 0) {
             throw new Error('No predictions returned');
         }
 
+        // Process results
         const top = results[0];
         let label = top.label;
         const confidence = Math.round(top.score * 100);
 
-        const plantKeywords = ['leaf', 'plant', 'flower', 'tree', 'crop', 'vegetable', 'fruit', 'garden', 'weed', 'herb', 'green'];
+        // Check if it's a plant
+        const plantKeywords = ['leaf', 'plant', 'flower', 'tree', 'crop', 'vegetable', 'fruit', 'garden', 'weed', 'herb', 'green', 'leafy'];
         const isPlant = plantKeywords.some(keyword => label.toLowerCase().includes(keyword));
 
         let disease = label;
@@ -179,10 +164,6 @@ async function runPrediction(imageDataUrl) {
             isHealthy = label.toLowerCase().includes('healthy') || 
                        label.toLowerCase().includes('good') ||
                        label.toLowerCase().includes('clean');
-            
-            if (label.includes('___')) {
-                disease = label.replace(/___/g, ' → ').replace(/_/g, ' ');
-            }
         } else {
             disease = 'Not a plant image';
             isHealthy = false;
@@ -223,6 +204,7 @@ function displayResult(result) {
     const icon = isHealthy ? '🌿' : '⚠️';
     const statusClass = isHealthy ? 'healthy' : 'affected';
 
+    // Top 5 predictions
     let top5HTML = '';
     if (result.allResults && result.allResults.length > 0) {
         top5HTML = `
@@ -238,6 +220,7 @@ function displayResult(result) {
         `;
     }
 
+    // Not a plant warning
     let notPlantWarning = '';
     if (result.isPlant === false) {
         notPlantWarning = `
@@ -248,11 +231,12 @@ function displayResult(result) {
         `;
     }
 
+    // Recommendations
     let recommendation = '';
     if (!isHealthy && result.confidence >= 40 && result.isPlant !== false) {
         recommendation = `
             <div class="advice">
-                <strong>💡 Treatment Recommendation:</strong>
+                <strong>💡 Recommendation:</strong>
                 <p>Consult with an agricultural expert for confirmation.</p>
             </div>
         `;
@@ -260,11 +244,12 @@ function displayResult(result) {
         recommendation = `
             <div class="advice" style="background:rgba(232,245,233,0.8);border-left-color:#2e7d32;">
                 <strong>✅ Plant is Healthy!</strong>
-                <p>Continue with regular care. Your plant looks good! 🌱</p>
+                <p>Continue with regular care. 🌱</p>
             </div>
         `;
     }
 
+    // Low confidence
     let confidenceWarning = '';
     if (result.confidence < 40 && result.isPlant !== false) {
         confidenceWarning = `
@@ -288,7 +273,7 @@ function displayResult(result) {
             <p><strong>Confidence:</strong> ${result.confidence}%</p>
             <p><strong>Detected Condition:</strong> ${result.disease}</p>
             <p class="detail" style="background:rgba(245,245,245,0.6);padding:8px 16px;border-radius:8px;font-size:0.9rem;">
-                <strong>Model:</strong> Transformers.js • ResNet-50
+                <strong>Model:</strong> Transformers.js • ViT-base
             </p>
 
             ${top5HTML}
@@ -369,7 +354,7 @@ function stopCamera() {
 }
 
 // ============================================
-// CAPTURE FROM CAMERA
+// CAPTURE
 // ============================================
 captureBtn.addEventListener('click', () => {
     if (!stream || !video.videoWidth) {
@@ -392,7 +377,7 @@ captureBtn.addEventListener('click', () => {
 });
 
 // ============================================
-// FILE UPLOAD
+// UPLOAD
 // ============================================
 fileInput.addEventListener('change', (event) => {
     const file = event.target.files[0];
@@ -431,7 +416,7 @@ fileInput.addEventListener('change', (event) => {
 // INITIALIZE
 // ============================================
 console.log('🌱 Plant Disease Detector starting...');
-console.log('🧠 Using Transformers.js with ResNet-50');
+console.log('🧠 Using Transformers.js with ViT-base');
 
 loadModel();
 cameraTabBtn.classList.add('active');
