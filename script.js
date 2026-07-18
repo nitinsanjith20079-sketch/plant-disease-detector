@@ -1,6 +1,5 @@
 // ============================================
-// PLANT DISEASE DETECTOR - TRANSFORMERS.JS
-// WORKING VERSION - Uses ResNet-50
+// PLANT DISEASE DETECTOR - COMPLETE WORKING
 // ============================================
 
 // --- DOM Elements ---
@@ -65,18 +64,17 @@ const CLASS_NAMES = [
 ];
 
 // ============================================
-// LOAD MODEL - USING WORKING RESNET-50
+// LOAD MODEL
 // ============================================
 async function loadModel() {
     if (classifier) return classifier;
 
     try {
         modelStatus.textContent = '🧠 Downloading AI model... (may take 1-2 minutes)';
+        modelStatus.className = 'model-status';
 
-        // Import Transformers.js dynamically
         const { pipeline } = await import('@huggingface/transformers');
 
-        // Use a reliable, well-tested model
         classifier = await pipeline(
             'image-classification',
             'Xenova/resnet-50',
@@ -111,14 +109,13 @@ async function loadModel() {
 }
 
 // ============================================
-// RUN PREDICTION
+// RUN PREDICTION - FIXED
 // ============================================
 async function runPrediction(imageDataUrl) {
     loadingDiv.style.display = 'block';
     resultContainer.innerHTML = '';
 
     try {
-        // Make sure model is loaded
         if (!classifier) {
             await loadModel();
         }
@@ -137,49 +134,60 @@ async function runPrediction(imageDataUrl) {
         // Create image element
         const img = new Image();
         img.src = imageDataUrl;
+        
         await new Promise((resolve) => {
             img.onload = resolve;
             img.onerror = resolve;
+            setTimeout(resolve, 5000);
+        });
+
+        // Process image through canvas to ensure correct format
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 224;
+        canvas.height = 224;
+        ctx.drawImage(img, 0, 0, 224, 224);
+        
+        // Get the image data as a new image
+        const processedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        const processedImg = new Image();
+        processedImg.src = processedDataUrl;
+        
+        await new Promise((resolve) => {
+            processedImg.onload = resolve;
+            setTimeout(resolve, 1000);
         });
 
         // Run prediction
-        const results = await classifier(img);
+        const results = await classifier(processedImg);
 
         if (!results || results.length === 0) {
             throw new Error('No predictions returned');
         }
 
-        // Get top prediction
         const top = results[0];
         let label = top.label;
         const confidence = Math.round(top.score * 100);
 
-        // Check if it's a plant-related label
-        const plantKeywords = ['leaf', 'plant', 'flower', 'tree', 'crop', 'vegetable', 'fruit', 'garden', 'weed', 'herb'];
+        const plantKeywords = ['leaf', 'plant', 'flower', 'tree', 'crop', 'vegetable', 'fruit', 'garden', 'weed', 'herb', 'green'];
         const isPlant = plantKeywords.some(keyword => label.toLowerCase().includes(keyword));
 
         let disease = label;
         let isHealthy = false;
 
-        // Try to map to PlantVillage classes
         if (isPlant) {
-            // For ResNet-50, it gives labels like "leaf", "plant", etc.
-            // We need to map these to plant health status
             isHealthy = label.toLowerCase().includes('healthy') || 
                        label.toLowerCase().includes('good') ||
                        label.toLowerCase().includes('clean');
             
-            // Format the disease name
             if (label.includes('___')) {
                 disease = label.replace(/___/g, ' → ').replace(/_/g, ' ');
             }
         } else {
-            // If not a plant, show a warning
             disease = 'Not a plant image';
             isHealthy = false;
         }
 
-        // Display results
         displayResult({
             disease: disease,
             confidence: confidence,
@@ -215,7 +223,6 @@ function displayResult(result) {
     const icon = isHealthy ? '🌿' : '⚠️';
     const statusClass = isHealthy ? 'healthy' : 'affected';
 
-    // Build top 5 predictions
     let top5HTML = '';
     if (result.allResults && result.allResults.length > 0) {
         top5HTML = `
@@ -231,59 +238,39 @@ function displayResult(result) {
         `;
     }
 
-    // Warning if not a plant
     let notPlantWarning = '';
-    if (result.isPlant === false && result.disease === 'Not a plant image') {
+    if (result.isPlant === false) {
         notPlantWarning = `
             <div class="advice" style="background:rgba(255,243,224,0.8);border-left-color:#ff6f00;">
                 <strong>⚠️ Not a Plant</strong>
                 <p>This doesn't appear to be a plant image. Please upload a photo of a plant leaf.</p>
-                <ul>
-                    <li>📸 Take a clear photo of a <strong>single leaf</strong></li>
-                    <li>☀️ Use <strong>natural daylight</strong></li>
-                    <li>📏 Get <strong>close</strong> to the leaf</li>
-                </ul>
             </div>
         `;
     }
 
-    // Recommendations
     let recommendation = '';
     if (!isHealthy && result.confidence >= 40 && result.isPlant !== false) {
         recommendation = `
             <div class="advice">
                 <strong>💡 Treatment Recommendation:</strong>
-                <p>Based on the analysis:</p>
-                <ul>
-                    <li>Consult with an agricultural expert for confirmation</li>
-                    <li>Consider appropriate organic fungicides or pesticides</li>
-                    <li>Remove affected leaves to prevent spread</li>
-                    <li>Monitor the plant regularly</li>
-                </ul>
+                <p>Consult with an agricultural expert for confirmation.</p>
             </div>
         `;
     } else if (isHealthy && result.confidence >= 40 && result.isPlant !== false) {
         recommendation = `
             <div class="advice" style="background:rgba(232,245,233,0.8);border-left-color:#2e7d32;">
                 <strong>✅ Plant is Healthy!</strong>
-                <p>Your plant shows no signs of disease. Continue with regular care.</p>
+                <p>Continue with regular care. Your plant looks good! 🌱</p>
             </div>
         `;
     }
 
-    // Low confidence warning
     let confidenceWarning = '';
     if (result.confidence < 40 && result.isPlant !== false) {
         confidenceWarning = `
             <div class="advice" style="background:rgba(255,243,224,0.8);border-left-color:#ff6f00;">
-                <strong>⚠️ Low Confidence Warning</strong>
-                <p>This prediction has low confidence (${result.confidence}%).</p>
-                <ul>
-                    <li>📸 Take a clear photo of a <strong>single leaf</strong></li>
-                    <li>☀️ Use <strong>natural daylight</strong></li>
-                    <li>📏 Get <strong>close</strong> to the leaf</li>
-                    <li>🤚 Keep the camera <strong>steady</strong></li>
-                </ul>
+                <strong>⚠️ Low Confidence</strong>
+                <p>Try taking a clearer photo with better lighting.</p>
             </div>
         `;
     }
@@ -341,11 +328,10 @@ uploadTabBtn.addEventListener('click', () => {
 async function startCamera() {
     try {
         if (stream) return;
-
         console.log('📸 Starting camera...');
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            alert('Your browser does not support camera access. Please use the upload feature.');
+            alert('Your browser does not support camera access.');
             return;
         }
 
@@ -365,11 +351,7 @@ async function startCamera() {
 
     } catch (err) {
         console.error('❌ Camera error:', err);
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-            alert('Camera access denied. Please allow camera access in browser settings.');
-        } else {
-            alert(`Camera error: ${err.message}`);
-        }
+        alert('Camera access denied. Please use the upload feature.');
         uploadTabBtn.click();
     }
 }
@@ -391,7 +373,7 @@ function stopCamera() {
 // ============================================
 captureBtn.addEventListener('click', () => {
     if (!stream || !video.videoWidth) {
-        alert('Camera is not ready. Please wait or refresh.');
+        alert('Camera is not ready.');
         return;
     }
 
@@ -405,7 +387,7 @@ captureBtn.addEventListener('click', () => {
         runPrediction(imageDataUrl);
     } catch (err) {
         console.error('❌ Capture error:', err);
-        alert('Failed to capture image. Please try again.');
+        alert('Failed to capture image.');
     }
 });
 
@@ -415,8 +397,6 @@ captureBtn.addEventListener('click', () => {
 fileInput.addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
-    console.log(`📁 File selected: ${file.name}`);
 
     if (!file.type.startsWith('image/')) {
         alert('Please select an image file.');
@@ -438,11 +418,11 @@ fileInput.addEventListener('change', (event) => {
             runPrediction(imageDataUrl);
         } catch (err) {
             console.error('❌ File read error:', err);
-            alert('Failed to read file. Please try again.');
+            alert('Failed to read file.');
         }
     };
     reader.onerror = () => {
-        alert('Failed to read file. Please try again.');
+        alert('Failed to read file.');
     };
     reader.readAsDataURL(file);
 });
@@ -453,9 +433,6 @@ fileInput.addEventListener('change', (event) => {
 console.log('🌱 Plant Disease Detector starting...');
 console.log('🧠 Using Transformers.js with ResNet-50');
 
-// Load model in background
 loadModel();
-
-// Start with camera tab
 cameraTabBtn.classList.add('active');
 startCamera();
