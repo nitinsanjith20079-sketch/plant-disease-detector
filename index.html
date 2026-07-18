@@ -22,7 +22,7 @@
     <div id="app">
         <header>
             <h1>🌱 Plant Disease Detector</h1>
-            <p>AI-powered plant health analysis using Transformers.js</p>
+            <p>AI-powered plant health analysis using TensorFlow.js</p>
         </header>
 
         <div id="modelStatus" class="model-status">🧠 Loading AI model...</div>
@@ -58,15 +58,12 @@
         </div>
     </div>
 
-    <!-- Transformers.js -->
-    <script type="importmap">
-        {
-            "imports": {
-                "@huggingface/transformers": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2"
-            }
-        }
-    </script>
-
-    <script type="module" src="script.js"></script>
+    <!-- ============================================ -->
+    <!-- TENSORFLOW.JS - This is the ONLY library we need -->
+    <!-- ============================================ -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    
+    <!-- Our app script -->
+    <script src="script.js"></script>
 </body>
 </html>
