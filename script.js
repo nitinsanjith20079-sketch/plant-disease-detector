@@ -183,4 +183,234 @@ fileInput.addEventListener('change', (event) => {
         return;
     }
     
-    if (file
+    if (file.size > 5 * 1024 * 1024) {
+        alert("Image too large (max 5MB).");
+        fileInput.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const imageDataUrl = e.target.result;
+            imagePreview.innerHTML = `<img src="${imageDataUrl}" alt="Uploaded Image">`;
+            runPrediction(imageDataUrl);
+        } catch (err) {
+            console.error("❌ File read error:", err);
+            alert("Failed to read file. Please try again.");
+        }
+    };
+    reader.onerror = () => {
+        alert("Failed to read file. Please try again.");
+    };
+    reader.readAsDataURL(file);
+});
+
+// ============================================
+// LOAD MODEL
+// ============================================
+async function loadModel() {
+    if (model) return model;
+    
+    try {
+        console.log("🧠 Loading PlantVillage model...");
+        
+        // Try loading as Graph Model first
+        try {
+            model = await tf.loadGraphModel(MODEL_URL);
+            console.log("✅ Model loaded as Graph Model!");
+            return model;
+        } catch (graphError) {
+            console.log("Graph model load failed, trying Layers model...");
+        }
+        
+        // Try loading as Layers Model
+        model = await tf.loadLayersModel(MODEL_URL);
+        console.log("✅ Model loaded as Layers Model!");
+        return model;
+        
+    } catch (error) {
+        console.error("❌ Error loading model:", error);
+        alert(
+            "Failed to load the PlantVillage AI model.\n\n" +
+            "Please check your internet connection and ensure the model URL is correct.\n\n" +
+            "Current model URL: " + MODEL_URL
+        );
+        return null;
+    }
+}
+
+// ============================================
+// PREDICTION FUNCTION
+// ============================================
+async function runPrediction(imageDataUrl) {
+    loadingDiv.style.display = 'block';
+    resultContainer.innerHTML = '';
+
+    const img = new Image();
+    img.src = imageDataUrl;
+    
+    img.onload = async function() {
+        try {
+            const model = await loadModel();
+            if (!model) {
+                loadingDiv.style.display = 'none';
+                return;
+            }
+
+            // Preprocess image
+            const tensor = tf.browser.fromPixels(img)
+                .resizeNearestNeighbor([224, 224])
+                .toFloat()
+                .expandDims();
+
+            // Normalize to [0,1] range
+            const normalized = tensor.div(255.0);
+
+            // Run prediction
+            let predictions;
+            try {
+                predictions = await model.predict(normalized);
+            } catch (predictError) {
+                console.log("Normalization failed, trying raw tensor...");
+                predictions = await model.predict(tensor);
+            }
+            
+            const data = await predictions.data();
+            
+            // Find top prediction
+            let maxConfidence = 0;
+            let maxIndex = 0;
+            for (let i = 0; i < data.length; i++) {
+                if (data[i] > maxConfidence) {
+                    maxConfidence = data[i];
+                    maxIndex = i;
+                }
+            }
+
+            const predictedClass = PLANTVILLAGE_CLASSES[maxIndex] || 'Unknown';
+            const confidence = Math.round(maxConfidence * 100);
+            const isHealthy = predictedClass.toLowerCase().includes('healthy');
+            
+            console.log(`📊 Prediction: ${predictedClass}, Confidence: ${confidence}%`);
+            
+            displayResult({
+                disease: predictedClass,
+                confidence: confidence,
+                isHealthy: isHealthy
+            });
+            
+            // Clean up tensors
+            tensor.dispose();
+            normalized.dispose();
+            predictions.dispose();
+            
+        } catch (error) {
+            console.error("❌ Prediction error:", error);
+            resultContainer.innerHTML = `
+                <div class="error">
+                    <strong>❌ Prediction Error</strong>
+                    <p>${error.message || 'Something went wrong. Please try again.'}</p>
+                    <p style="margin-top:8px;font-size:0.9rem;">
+                        <small>Note: Make sure the model URL is accessible and the image is clear.</small>
+                    </p>
+                </div>
+            `;
+        } finally {
+            loadingDiv.style.display = 'none';
+        }
+    };
+    
+    img.onerror = function() {
+        loadingDiv.style.display = 'none';
+        alert("Failed to load the image. Please try again.");
+    };
+}
+
+// ============================================
+// DISPLAY RESULT
+// ============================================
+function displayResult(result) {
+    const isHealthy = result.isHealthy;
+    const cardClass = isHealthy ? 'result-card' : 'result-card affected';
+    const statusText = isHealthy ? '🌿 Healthy' : '⚠️ Affected';
+    const icon = isHealthy ? '🌿' : '⚠️';
+    const statusClass = isHealthy ? 'healthy' : 'affected';
+    
+    let recommendation = '';
+    if (!isHealthy && result.confidence >= 50) {
+        recommendation = `
+            <div class="advice">
+                <strong>💡 Treatment Recommendation:</strong>
+                <p>Based on the detection of <strong>${result.disease}</strong>:</p>
+                <ul>
+                    <li>Consult with an agricultural expert for confirmation</li>
+                    <li>Consider appropriate organic fungicides or pesticides</li>
+                    <li>Remove affected leaves to prevent spread</li>
+                    <li>Monitor the plant regularly</li>
+                </ul>
+            </div>
+        `;
+    } else if (isHealthy && result.confidence >= 50) {
+        recommendation = `
+            <div class="advice" style="background: rgba(232, 245, 233, 0.8); border-left-color: #2e7d32;">
+                <strong>✅ Plant is Healthy!</strong>
+                <p>Your plant shows no signs of disease. Continue with regular care:</p>
+                <ul>
+                    <li>Water appropriately</li>
+                    <li>Ensure adequate sunlight</li>
+                    <li>Monitor for pests regularly</li>
+                </ul>
+            </div>
+        `;
+    }
+    
+    let confidenceWarning = '';
+    if (result.confidence < 50) {
+        confidenceWarning = `
+            <div class="advice" style="background: rgba(255, 243, 224, 0.8); border-left-color: #ff6f00;">
+                <strong>⚠️ Low Confidence Warning</strong>
+                <p>This prediction has low confidence (${result.confidence}%).</p>
+                <p style="font-size:0.9rem;margin-top:4px;">
+                    Try taking a clearer photo with better lighting or a closer view of the leaf.
+                </p>
+            </div>
+        `;
+    }
+    
+    resultContainer.innerHTML = `
+        <div class="${cardClass}">
+            <span class="status-icon">${icon}</span>
+            <h3>Analysis Result</h3>
+            <p class="status ${statusClass}">${statusText}</p>
+            
+            <div class="confidence-bar">
+                <div class="confidence-fill" style="width: ${result.confidence}%;"></div>
+            </div>
+            
+            <p><strong>Confidence:</strong> ${result.confidence}%</p>
+            <p><strong>Detected Condition:</strong> ${result.disease}</p>
+            <p class="detail"><strong>Model:</strong> PlantVillage Dataset (38 classes)</p>
+            
+            ${confidenceWarning}
+            ${recommendation}
+            
+            <div style="margin-top:12px;font-size:0.85rem;color:#666;text-align:center;border-top:1px solid rgba(0,0,0,0.1);padding-top:12px;">
+                <small>🔬 Powered by TensorFlow.js • PlantVillage Dataset • 38 Disease Classes</small>
+            </div>
+        </div>
+    `;
+}
+
+// ============================================
+// INITIALIZE
+// ============================================
+console.log("🌱 Plant Disease Detector starting...");
+console.log("📊 Using PlantVillage dataset with 38 disease classes");
+
+// Load model in background
+loadModel();
+
+// Start with camera tab active
+cameraTabBtn.classList.add('active');
+startCamera();
