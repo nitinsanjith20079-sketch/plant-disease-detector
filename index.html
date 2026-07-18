@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🌱 Plant Disease Detector - AI Powered</title>
-    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🌱 Plant Disease Detector</title>
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
     <!-- Animated Background -->
@@ -22,8 +22,10 @@
     <div id="app">
         <header>
             <h1>🌱 Plant Disease Detector</h1>
-            <p>AI-powered plant health analysis using PlantVillage dataset</p>
+            <p>AI-powered plant health analysis using Transformers.js</p>
         </header>
+
+        <div id="modelStatus" class="model-status">🧠 Loading AI model...</div>
 
         <div class="tab-buttons">
             <button id="cameraTabBtn" class="active">📸 Take Photo</button>
@@ -40,24 +42,31 @@
             </div>
 
             <!-- Upload Tab -->
-            <div id="uploadTab" class="tab-content" style="display: none;">
+            <div id="uploadTab" class="tab-content" style="display: none">
                 <div class="upload-container">
                     <label for="fileInput">📁 Choose Image</label>
-                    <input type="file" id="fileInput" accept="image/*">
+                    <input type="file" id="fileInput" accept="image/*" />
                     <div id="imagePreview"></div>
                 </div>
             </div>
         </div>
 
-        <div id="loading" class="loading" style="display: none;">🔍 Analyzing your plant...</div>
+        <div id="loading" class="loading" style="display: none">🔍 Analyzing your plant...</div>
 
         <div id="resultContainer" class="result-container">
-            <!-- Results will be dynamically inserted here -->
+            <!-- Results go here -->
         </div>
     </div>
 
-    <!-- Include TensorFlow.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
-    <script src="script.js"></script>
+    <!-- Transformers.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "@huggingface/transformers": "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.2"
+            }
+        }
+    </script>
+
+    <script type="module" src="script.js"></script>
 </body>
 </html>
