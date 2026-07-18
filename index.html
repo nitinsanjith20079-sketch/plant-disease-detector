@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plant Disease Detector</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>🌱 Plant Disease Detector</h1>
+            <p>Analyze your plants for diseases using AI</p>
+        </header>
+
+        <div class="tab-buttons">
+            <button id="cameraTabBtn">📸 Take Photo</button>
+            <button id="uploadTabBtn">📁 Upload Image</button>
+        </div>
+
+        <div class="content">
+            <!-- Camera Tab -->
+            <div id="cameraTab" class="tab-content">
+                <div class="camera-container">
+                    <video id="video" autoplay playsinline></video>
+                    <button id="captureBtn">📸 Capture</button>
+                </div>
+            </div>
+
+            <!-- Upload Tab -->
+            <div id="uploadTab" class="tab-content" style="display: none;">
+                <div class="upload-container">
+                    <input type="file" id="fileInput" accept="image/*">
+                    <div id="imagePreview"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading" style="display: none;">Analyzing... 🔍</div>
+
+        <div id="resultContainer" class="result-container">
+            <!-- Results will be dynamically inserted here -->
+        </div>
+    </div>
+
+    <!-- Include TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest"></script>
+    <script src="script.js"></script>
+</body>
+</html>
