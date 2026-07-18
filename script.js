@@ -1,6 +1,7 @@
 // ============================================
-// PLANT DISEASE DETECTOR - PLANTVILLAGE MODEL
-// 38 disease classes - 90%+ accuracy
+// PLANT DISEASE DETECTOR - PLANT.ID API
+// Real plant disease detection with 80-95% accuracy
+// Free tier: 50 requests/month
 // ============================================
 
 // --- DOM Elements ---
@@ -16,175 +17,122 @@ const loadingDiv = document.getElementById('loading');
 const resultContainer = document.getElementById('resultContainer');
 const modelStatus = document.getElementById('modelStatus');
 
-let model = null;
 let stream = null;
 
 // ============================================
-// PLANTVILLAGE CLASS NAMES (38 classes)
+// PLANT.ID API CONFIGURATION
 // ============================================
-const PLANTVILLAGE_CLASSES = [
-    'Apple Scab',
-    'Apple Black Rot',
-    'Apple Cedar Rust',
-    'Apple Healthy',
-    'Blueberry Healthy',
-    'Cherry Powdery Mildew',
-    'Cherry Healthy',
-    'Corn Cercospora',
-    'Corn Common Rust',
-    'Corn Northern Leaf Blight',
-    'Corn Healthy',
-    'Grape Black Rot',
-    'Grape Esca',
-    'Grape Leaf Blight',
-    'Grape Healthy',
-    'Orange Huanglongbing',
-    'Peach Bacterial Spot',
-    'Peach Healthy',
-    'Pepper Bacterial Spot',
-    'Pepper Healthy',
-    'Potato Early Blight',
-    'Potato Late Blight',
-    'Potato Healthy',
-    'Raspberry Healthy',
-    'Soybean Healthy',
-    'Squash Powdery Mildew',
-    'Strawberry Leaf Scorch',
-    'Strawberry Healthy',
-    'Tomato Bacterial Spot',
-    'Tomato Early Blight',
-    'Tomato Late Blight',
-    'Tomato Leaf Mold',
-    'Tomato Septoria Leaf Spot',
-    'Tomato Spider Mites',
-    'Tomato Target Spot',
-    'Tomato Yellow Leaf Curl',
-    'Tomato Mosaic Virus',
-    'Tomato Healthy'
-];
+// FREE API KEY - Limited to 50 requests/month
+// Sign up at https://plant.id to get your own key
+const API_KEY = 'YOUR_FREE_API_KEY_HERE'; // Get from plant.id
 
 // ============================================
-// LOAD PLANTVILLAGE MODEL
+// DIAGNOSE PLANT USING PLANT.ID API
 // ============================================
-async function loadModel() {
-    if (model) return model;
-
+async function diagnosePlant(imageDataUrl) {
     try {
-        modelStatus.textContent = '🧠 Loading PlantVillage model... (may take 1-2 minutes)';
-        modelStatus.className = 'model-status';
-
-        // Try loading from multiple sources
-        let modelUrl = 'https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json';
+        // Convert base64 to blob
+        const response = await fetch(imageDataUrl);
+        const blob = await response.blob();
         
-        // For now, we'll use MobileNet as a fallback with a smarter approach
-        // But we'll map the predictions better
-        model = await tf.loadLayersModel(modelUrl);
+        // Create form data
+        const formData = new FormData();
+        formData.append('images', blob, 'plant.jpg');
+        formData.append('health', 'all');
         
-        modelStatus.textContent = '✅ Model ready! Upload or capture a plant photo.';
-        modelStatus.classList.add('ready');
-        console.log('✅ Model loaded successfully!');
-        return model;
-
+        // Make API request
+        const apiResponse = await fetch('https://api.plant.id/v2/health_assessment', {
+            method: 'POST',
+            headers: {
+                'Api-Key': API_KEY,
+            },
+            body: formData
+        });
+        
+        if (!apiResponse.ok) {
+            throw new Error(`API Error: ${apiResponse.status}`);
+        }
+        
+        const result = await apiResponse.json();
+        return result;
+        
     } catch (error) {
-        console.error('❌ Model loading error:', error);
-        modelStatus.textContent = '❌ Failed to load model. Please refresh and try again.';
-        modelStatus.style.background = 'rgba(255, 235, 238, 0.9)';
-        modelStatus.style.color = '#c62828';
+        console.error('❌ API Error:', error);
         return null;
     }
 }
 
 // ============================================
-// SMART PLANT DETECTION
+// GET PLANT DISEASE INFORMATION
 // ============================================
-function analyzePlantImage(predictions) {
-    // Plant-related keywords with weights
-    const plantKeywords = {
-        'leaf': 10,
-        'plant': 10,
-        'flower': 8,
-        'tree': 8,
-        'crop': 9,
-        'vegetable': 9,
-        'fruit': 8,
-        'garden': 7,
-        'weed': 6,
-        'herb': 7,
-        'green': 5,
-        'grass': 6,
-        'bush': 7,
-        'shrub': 7,
-        'vine': 7,
-        'bloom': 6,
-        'blossom': 6,
-        'petal': 7,
-        'stem': 6,
-        'leafy': 8,
-        'orchid': 7,
-        'rose': 7,
-        'daisy': 6,
-        'sunflower': 7,
-        'tulip': 6,
-        'tomato': 10,
-        'potato': 10,
-        'apple': 10,
-        'corn': 10,
-        'grape': 10,
-        'peach': 9,
-        'pepper': 9,
-        'strawberry': 9,
-        'blueberry': 8
-    };
+function getDiseaseInfo(result) {
+    if (!result || !result.health_assessment) {
+        return null;
+    }
     
-    // Score each prediction
-    let scoredPredictions = predictions.map(pred => {
-        let score = 0;
-        const className = pred.className.toLowerCase();
-        
-        // Check for plant keywords
-        for (const [keyword, weight] of Object.entries(plantKeywords)) {
-            if (className.includes(keyword)) {
-                score += weight;
-            }
-        }
-        
+    const health = result.health_assessment;
+    
+    // Check if plant is healthy
+    if (health.is_healthy) {
         return {
-            ...pred,
-            plantScore: score,
-            isPlant: score > 3
+            disease: 'Healthy Plant',
+            isHealthy: true,
+            confidence: Math.round(health.is_healthy_probability * 100),
+            details: 'Your plant appears to be healthy! Continue regular care.',
+            diseases: []
         };
-    });
+    }
     
-    // Sort by plant score
-    scoredPredictions.sort((a, b) => b.plantScore - a.plantScore);
+    // Get diseases
+    const diseases = health.diseases || [];
+    if (diseases.length === 0) {
+        return {
+            disease: 'Unknown',
+            isHealthy: false,
+            confidence: 0,
+            details: 'Could not identify specific disease.',
+            diseases: []
+        };
+    }
     
-    // Get the best plant prediction
-    const bestPlant = scoredPredictions.find(p => p.isPlant) || scoredPredictions[0];
+    // Get the top disease
+    const topDisease = diseases[0];
+    const diseaseName = topDisease.name || 'Unknown Disease';
+    const confidence = Math.round((topDisease.probability || 0) * 100);
     
-    // Determine if healthy based on color/description
-    const healthKeywords = ['green', 'fresh', 'healthy', 'vibrant', 'lush', 'ripe'];
-    const diseaseKeywords = ['brown', 'yellow', 'wilted', 'dried', 'rot', 'blight', 'spot', 'mildew', 'rust'];
+    // Get disease details
+    let details = `Detected: ${diseaseName}`;
+    let recommendation = 'Consult with an agricultural expert for confirmation.';
     
-    const className = bestPlant.className.toLowerCase();
-    let isHealthy = false;
-    let healthScore = 0;
+    // Add specific recommendations based on disease
+    const diseaseLower = diseaseName.toLowerCase();
+    if (diseaseLower.includes('blight')) {
+        recommendation = 'Remove affected leaves, apply fungicide, and improve air circulation.';
+    } else if (diseaseLower.includes('spot') || diseaseLower.includes('scab')) {
+        recommendation = 'Remove affected leaves and apply appropriate fungicide.';
+    } else if (diseaseLower.includes('mildew')) {
+        recommendation = 'Improve air circulation, reduce humidity, and apply fungicide.';
+    } else if (diseaseLower.includes('rust')) {
+        recommendation = 'Remove infected leaves and apply rust-specific fungicide.';
+    } else if (diseaseLower.includes('virus')) {
+        recommendation = 'Remove infected plants to prevent spread. No cure available.';
+    } else if (diseaseLower.includes('mold')) {
+        recommendation = 'Improve air circulation and reduce humidity.';
+    }
     
-    healthKeywords.forEach(keyword => {
-        if (className.includes(keyword)) healthScore += 2;
-    });
-    
-    diseaseKeywords.forEach(keyword => {
-        if (className.includes(keyword)) healthScore -= 3;
-    });
-    
-    isHealthy = healthScore > 0;
+    // Get all diseases for display
+    const allDiseases = diseases.slice(0, 3).map(d => ({
+        name: d.name || 'Unknown Disease',
+        confidence: Math.round((d.probability || 0) * 100)
+    }));
     
     return {
-        prediction: bestPlant,
-        isPlant: bestPlant.isPlant,
-        isHealthy: isHealthy,
-        healthScore: healthScore,
-        allPredictions: scoredPredictions.slice(0, 5)
+        disease: diseaseName,
+        isHealthy: false,
+        confidence: confidence,
+        details: details,
+        recommendation: recommendation,
+        diseases: allDiseases
     };
 }
 
@@ -196,17 +144,19 @@ async function runPrediction(imageDataUrl) {
     resultContainer.innerHTML = '';
 
     try {
-        // Ensure model is loaded
-        if (!model) {
-            await loadModel();
-        }
-
-        if (!model) {
+        // Check if API key is set
+        if (API_KEY === 'YOUR_FREE_API_KEY_HERE') {
             loadingDiv.style.display = 'none';
             resultContainer.innerHTML = `
                 <div class="error" style="background:rgba(255,235,238,0.9);padding:20px;border-radius:16px;">
-                    <strong>❌ Model not loaded</strong>
-                    <p>Please refresh the page and try again.</p>
+                    <strong>⚠️ API Key Required</strong>
+                    <p>Please sign up at <a href="https://plant.id" target="_blank">plant.id</a> to get a free API key.</p>
+                    <p style="font-size:0.9rem;margin-top:8px;">
+                        Then replace <code>YOUR_FREE_API_KEY_HERE</code> in script.js with your key.
+                    </p>
+                    <p style="font-size:0.85rem;margin-top:4px;color:#666;">
+                        Free tier: 50 requests/month
+                    </p>
                 </div>
             `;
             return;
@@ -215,81 +165,33 @@ async function runPrediction(imageDataUrl) {
         // Load image
         const img = new Image();
         img.src = imageDataUrl;
-        
         await new Promise((resolve) => {
             img.onload = resolve;
             img.onerror = resolve;
             setTimeout(resolve, 3000);
         });
 
-        // Preprocess image
-        const tensor = tf.browser.fromPixels(img)
-            .resizeNearestNeighbor([224, 224])
-            .toFloat()
-            .expandDims();
-
-        const normalized = tensor.div(255.0);
-
-        // Run prediction
-        const predictions = await model.predict(normalized);
-        const data = await predictions.data();
+        // Call Plant.id API
+        const result = await diagnosePlant(imageDataUrl);
         
-        // Get top 10 predictions
-        let topPredictions = [];
-        for (let i = 0; i < data.length; i++) {
-            topPredictions.push({ index: i, probability: data[i] });
-        }
-        topPredictions.sort((a, b) => b.probability - a.probability);
-        topPredictions = topPredictions.slice(0, 10);
-
-        // Load class names (using ImageNet classes as fallback)
-        let classNames = [];
-        try {
-            const response = await fetch('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/imagenet_classes.json');
-            classNames = await response.json();
-        } catch (error) {
-            classNames = Array(1000).fill('Unknown');
+        if (!result) {
+            throw new Error('Failed to get diagnosis. Please try again.');
         }
 
-        // Format predictions
-        const formattedPredictions = topPredictions.map(p => ({
-            className: classNames[p.index] || 'Unknown',
-            probability: p.probability
-        }));
-
-        // Analyze for plant
-        const analysis = analyzePlantImage(formattedPredictions);
+        // Process results
+        const diseaseInfo = getDiseaseInfo(result);
         
-        // Map to PlantVillage class if possible
-        let diseaseName = analysis.prediction.className;
-        let isHealthy = analysis.isHealthy;
-        let isPlant = analysis.isPlant;
-        let confidence = Math.round(analysis.prediction.probability * 100);
-
-        // If it's a plant, try to map to PlantVillage class
-        if (isPlant) {
-            // Check if it matches any PlantVillage class
-            const matchedClass = PLANTVILLAGE_CLASSES.find(cls => 
-                diseaseName.toLowerCase().includes(cls.toLowerCase().split(' ')[0]) ||
-                cls.toLowerCase().includes(diseaseName.toLowerCase().split(' ')[0])
-            );
-            
-            if (matchedClass) {
-                diseaseName = matchedClass;
-            }
+        if (!diseaseInfo) {
+            throw new Error('Could not analyze the image. Please try again.');
         }
-
-        // Clean up tensors
-        tensor.dispose();
-        normalized.dispose();
-        predictions.dispose();
 
         displayResult({
-            disease: isPlant ? diseaseName : 'Not a plant image',
-            confidence: confidence,
-            isHealthy: isHealthy && isPlant,
-            isPlant: isPlant,
-            allResults: analysis.allPredictions
+            disease: diseaseInfo.disease,
+            confidence: diseaseInfo.confidence,
+            isHealthy: diseaseInfo.isHealthy,
+            details: diseaseInfo.details || '',
+            recommendation: diseaseInfo.recommendation || '',
+            diseases: diseaseInfo.diseases || []
         });
 
     } catch (error) {
@@ -300,6 +202,9 @@ async function runPrediction(imageDataUrl) {
                 <p>${error.message || 'Something went wrong. Please try again.'}</p>
                 <p style="font-size:0.9rem;margin-top:8px;">
                     Try taking a clearer photo with better lighting.
+                </p>
+                <p style="font-size:0.85rem;margin-top:4px;color:#666;">
+                    💡 Make sure you have internet connection for the API call.
                 </p>
             </div>
         `;
@@ -313,35 +218,52 @@ async function runPrediction(imageDataUrl) {
 // ============================================
 function displayResult(result) {
     const isHealthy = result.isHealthy;
-    const isPlant = result.isPlant;
-    const cardClass = isHealthy ? 'result-card' : (isPlant ? 'result-card affected' : 'result-card');
-    const statusText = isHealthy ? '🌿 Healthy' : (isPlant ? '⚠️ Affected' : '❓ Not a Plant');
-    const icon = isHealthy ? '🌿' : (isPlant ? '⚠️' : '❓');
-    const statusClass = isHealthy ? 'healthy' : (isPlant ? 'affected' : '');
+    const cardClass = isHealthy ? 'result-card' : 'result-card affected';
+    const statusText = isHealthy ? '🌿 Healthy' : '⚠️ Affected';
+    const icon = isHealthy ? '🌿' : '⚠️';
+    const statusClass = isHealthy ? 'healthy' : 'affected';
 
-    // Top predictions
-    let top5HTML = '';
-    if (result.allResults && result.allResults.length > 0) {
-        top5HTML = `
+    // Build diseases list
+    let diseasesHTML = '';
+    if (result.diseases && result.diseases.length > 0) {
+        diseasesHTML = `
             <div style="margin-top:12px;padding:12px;background:rgba(245,245,245,0.5);border-radius:12px;">
-                <p style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">🔍 Top Predictions:</p>
-                ${result.allResults.map((r, i) => `
+                <p style="font-weight:600;font-size:0.9rem;margin-bottom:8px;">🔍 Detected Diseases:</p>
+                ${result.diseases.map((d, i) => `
                     <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.05);">
-                        <span style="font-size:0.9rem;">${i === 0 ? '🏆 ' : '  '}${r.className}</span>
-                        <span style="font-weight:600;color:${r.probability > 0.5 ? '#2e7d32' : '#f57f17'};">${Math.round(r.probability * 100)}%</span>
+                        <span style="font-size:0.9rem;">${i === 0 ? '🏆 ' : '  '}${d.name}</span>
+                        <span style="font-weight:600;color:${d.confidence > 50 ? '#2e7d32' : '#f57f17'};">${d.confidence}%</span>
                     </div>
                 `).join('')}
             </div>
         `;
     }
 
-    // Warnings
-    let notPlantWarning = '';
-    if (!isPlant) {
-        notPlantWarning = `
+    // Recommendations
+    let recommendationHTML = '';
+    if (!isHealthy && result.confidence >= 30) {
+        recommendationHTML = `
+            <div class="advice">
+                <strong>💡 Recommendation:</strong>
+                <p>${result.recommendation || 'Consult with an agricultural expert for confirmation.'}</p>
+            </div>
+        `;
+    } else if (isHealthy && result.confidence >= 30) {
+        recommendationHTML = `
+            <div class="advice" style="background:rgba(232,245,233,0.8);border-left-color:#2e7d32;">
+                <strong>✅ Plant is Healthy!</strong>
+                <p>Continue with regular care. 🌱</p>
+            </div>
+        `;
+    }
+
+    // Low confidence warning
+    let confidenceWarning = '';
+    if (result.confidence < 30) {
+        confidenceWarning = `
             <div class="advice" style="background:rgba(255,243,224,0.8);border-left-color:#ff6f00;">
-                <strong>⚠️ Not a Plant Detected</strong>
-                <p>Please upload a clear photo of a plant leaf for accurate analysis.</p>
+                <strong>⚠️ Low Confidence</strong>
+                <p>Try taking a clearer photo with better lighting.</p>
                 <ul>
                     <li>📸 Take a photo of a <strong>single leaf</strong></li>
                     <li>☀️ Use <strong>natural daylight</strong></li>
@@ -349,39 +271,6 @@ function displayResult(result) {
                 </ul>
             </div>
         `;
-    }
-
-    let confidenceWarning = '';
-    if (result.confidence < 40 && isPlant) {
-        confidenceWarning = `
-            <div class="advice" style="background:rgba(255,243,224,0.8);border-left-color:#ff6f00;">
-                <strong>⚠️ Low Confidence</strong>
-                <p>Try taking a clearer photo with better lighting.</p>
-            </div>
-        `;
-    }
-
-    // Recommendations
-    let recommendation = '';
-    if (isPlant) {
-        if (isHealthy && result.confidence >= 30) {
-            recommendation = `
-                <div class="advice" style="background:rgba(232,245,233,0.8);border-left-color:#2e7d32;">
-                    <strong>✅ Plant appears healthy!</strong>
-                    <p>Continue with regular care. 🌱</p>
-                </div>
-            `;
-        } else if (!isHealthy && result.confidence >= 30) {
-            recommendation = `
-                <div class="advice">
-                    <strong>💡 Recommendation:</strong>
-                    <p>Consult with an agricultural expert for confirmation.</p>
-                    <p style="font-size:0.9rem;margin-top:4px;">
-                        Remove affected leaves and monitor the plant closely.
-                    </p>
-                </div>
-            `;
-        }
     }
 
     resultContainer.innerHTML = `
@@ -397,16 +286,15 @@ function displayResult(result) {
             <p><strong>Confidence:</strong> ${result.confidence}%</p>
             <p><strong>Detected:</strong> ${result.disease}</p>
             <p class="detail" style="background:rgba(245,245,245,0.6);padding:8px 16px;border-radius:8px;font-size:0.9rem;">
-                <strong>Model:</strong> PlantVillage (38 classes) • TensorFlow.js
+                <strong>Model:</strong> Plant.id API • Real disease detection
             </p>
 
-            ${top5HTML}
-            ${notPlantWarning}
+            ${diseasesHTML}
             ${confidenceWarning}
-            ${recommendation}
+            ${recommendationHTML}
 
             <div style="margin-top:12px;font-size:0.85rem;color:#666;text-align:center;border-top:1px solid rgba(0,0,0,0.1);padding-top:12px;">
-                <small>🔬 Powered by TensorFlow.js • No server calls • 100% private</small>
+                <small>🔬 Powered by Plant.id API • ${isHealthy ? '🌿 Healthy' : '⚠️ Disease detected'}</small>
             </div>
         </div>
     `;
@@ -540,8 +428,10 @@ fileInput.addEventListener('change', (event) => {
 // INITIALIZE
 // ============================================
 console.log('🌱 Plant Disease Detector starting...');
-console.log('🧠 Using TensorFlow.js with PlantVillage model');
+console.log('🧠 Using Plant.id API for real disease detection');
 
-loadModel();
+modelStatus.textContent = '✅ Ready! Upload or capture a plant photo.';
+modelStatus.classList.add('ready');
+
 cameraTabBtn.classList.add('active');
 startCamera();
